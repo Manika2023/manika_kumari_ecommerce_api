@@ -1,7 +1,7 @@
 # utils/pagination.py
 from django.core.paginator import Paginator
 
-def paginate_queryset(queryset, request, serializer_class, per_page=10):
+def paginate_queryset(queryset, request, serializer_class, per_page=11):
     """
     Paginate a queryset and serialize results.
     Returns a dictionary with pagination metadata and serialized data.

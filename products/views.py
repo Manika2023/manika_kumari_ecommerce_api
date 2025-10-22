@@ -17,22 +17,36 @@ class CategoryListApi(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        cache_key_name = "categories_list"
-        categories = cache.get(cache_key_name)
-        if not categories:
-           # Fetch from DB using optimized query
-           categories = Category.objects.all()
-           serializer = CategorySerializer(categories, many=True)
-           cache.set(cache_key_name,serializer.data,timeout=3600)
-        else:
-            # fetch from cache
-            serializer_data = categories
-            return Response({"data":serializer_data,"message":"fetch from the cache"},status=status.HTTP_200_OK)
+        # --- Collect filter params ---
+        filters = {
+            'category_id': request.query_params.get('category')
+        }
+       
+        # --- Unique cache key ---
+        cache_key = f"categories_{filters}_{request.query_params.get('page', 1)}"
+        # cache_key = "products_list"
 
-        return Response({
-            "data": serializer.data,
-            "message":"fetch from the DB"
-        }, status=status.HTTP_200_OK)
+        cached_data = cache.get(cache_key)
+        if cached_data:
+            return Response({"message":"fetched cached data","data":cached_data}, status=status.HTTP_200_OK)
+
+        # --- Base queryset ---
+        categories = Category.objects.all()
+        print("categories are:", categories)
+       
+        # --- Apply filters using helper ---
+        categories = apply_filters(categories, 'category', filters)
+
+        # --- Pagination ---
+        paginated_data = paginate_queryset(categories, request, CategorySerializer, per_page=11)
+
+        response_data = {
+            "message": "categories fetched successfully",
+            **paginated_data
+        }
+
+        cache.set(cache_key, response_data, timeout=3600)
+        return Response(response_data, status=status.HTTP_200_OK)
 
 
 class CategoryDetailApi(APIView):
@@ -55,7 +69,7 @@ class CategoryCreateApi(APIView):
         if serializer.is_valid():
             category = serializer.save()
             # Invalidate cache
-            cache.delete("categories_list")  
+            cache.clear()  
             return Response({
                 'category': CategorySerializer(category, context={'request': request}).data,
                 "message": "created successfully"
@@ -77,7 +91,7 @@ class CategoryUpdateApi(APIView):
         serializer = CategorySerializer(category, data=request.data, partial=True)
         if serializer.is_valid():
             category = serializer.save()
-            cache.delete("categories_list")
+            cache.clear()
             return Response({
                 "message": "category updated successfully",
                 "category": serializer.data
@@ -97,7 +111,7 @@ class CategoryDeleteApi(APIView):
         if not category:
             return Response({"message":"Category not found"},status=status.HTTP_404_NOT_FOUND)
         category.delete()
-        cache.delete("categories_list")
+        cache.clear()
         return Response({
             "message": "category deleted successfully"
         }, status=status.HTTP_200_OK)
@@ -116,7 +130,7 @@ class ProductListApi(APIView):
             'max_price': request.query_params.get('max_price'),
             'in_stock': request.query_params.get('in_stock'),
         }
-
+       
         # --- Unique cache key ---
         cache_key = f"products_{filters}_{request.query_params.get('page', 1)}"
         # cache_key = "products_list"
@@ -127,12 +141,12 @@ class ProductListApi(APIView):
 
         # --- Base queryset ---
         products = Product.objects.select_related("category").all()
-
+       
         # --- Apply filters using helper ---
         products = apply_filters(products, 'product', filters)
 
         # --- Pagination ---
-        paginated_data = paginate_queryset(products, request, ProductSerializer, per_page=10)
+        paginated_data = paginate_queryset(products, request, ProductSerializer, per_page=11)
 
         response_data = {
             "message": "products fetched successfully",
@@ -163,7 +177,7 @@ class ProductCreateApi(APIView):
         if serializer.is_valid():
             product = serializer.save()
             # Invalidate all product caches
-            clear_cache_by_prefix("products_")
+            cache.clear()
             return Response({
                 'product': ProductSerializer(product, context={'request': request}).data,
                 "message": "created successfully"
@@ -186,7 +200,7 @@ class ProductUpdateApi(APIView):
         if serializer.is_valid():
             product = serializer.save()
             # Invalidate all product caches
-            clear_cache_by_prefix("products_")
+            cache.clear()
             return Response({
                 "message": "Updated successfully",
                 "product": serializer.data
@@ -207,7 +221,7 @@ class ProductDeleteApi(APIView):
             return Response({"message":"product not found"})
         product.delete()
         # Invalidate all product caches
-        clear_cache_by_prefix("products_")
+        cache.clear()
         return Response({
             "message": "product deleted successfully"
         }, status=status.HTTP_200_OK)
