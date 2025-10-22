@@ -17,13 +17,7 @@ class CategoryListApi(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        # --- Collect filter params ---
-        filters = {
-            'category_id': request.query_params.get('category')
-        }
-       
-        # --- Unique cache key ---
-        cache_key = f"categories_{filters}_{request.query_params.get('page', 1)}"
+        cache_key = f"categories_{request.query_params.get('page', 10)}"
         # cache_key = "products_list"
 
         cached_data = cache.get(cache_key)
@@ -33,16 +27,12 @@ class CategoryListApi(APIView):
         # --- Base queryset ---
         categories = Category.objects.all()
         print("categories are:", categories)
-       
-        # --- Apply filters using helper ---
-        categories = apply_filters(categories, 'category', filters)
-
         # --- Pagination ---
-        paginated_data = paginate_queryset(categories, request, CategorySerializer, per_page=11)
+        paginated_data = paginate_queryset(categories, request, CategorySerializer, per_page=10)
 
         response_data = {
             "message": "categories fetched successfully",
-            **paginated_data
+           **paginated_data
         }
 
         cache.set(cache_key, response_data, timeout=3600)
@@ -124,6 +114,7 @@ class ProductListApi(APIView):
 
     def get(self, request):
         # --- Collect filter params ---
+        # http://127.0.0.1:8000/products/product/list/?max_price=5000
         filters = {
             'category_id': request.query_params.get('category'),
             'min_price': request.query_params.get('min_price'),
@@ -146,7 +137,7 @@ class ProductListApi(APIView):
         products = apply_filters(products, 'product', filters)
 
         # --- Pagination ---
-        paginated_data = paginate_queryset(products, request, ProductSerializer, per_page=11)
+        paginated_data = paginate_queryset(products, request, ProductSerializer, per_page=10)
 
         response_data = {
             "message": "products fetched successfully",
