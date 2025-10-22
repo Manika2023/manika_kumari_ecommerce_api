@@ -11,9 +11,10 @@ from .models import Cart, CartItem, Order
 from products.models import Product
 
 # class view for as to cart
-@method_decorator(csrf_exempt, name='dispatch')  # Disable CSRF for testing
+@method_decorator(csrf_exempt, name='dispatch')  
 class AddToCartView(APIView):
-    permission_classes = [permissions.IsAuthenticated]  # user must be logged in
+    # user must be logged in
+    permission_classes = [permissions.IsAuthenticated]  
 
     def post(self, request, product_id):
         """
@@ -93,7 +94,7 @@ class UpdateOrderStatusView(APIView):
                 "type": "order_status",
                 "order_id": order.id,
                 "status": order.status,
-               "total_price": int(order.total_price),  # Convert Decimal -> float
+               "total_price": int(order.total_price),  
                "products": [
                     {"Product_id": p.id, "name": p.name, "price": int(p.price)}
                     for p in order.products.all()
